@@ -1,0 +1,73 @@
+#Bulk simulation
+
+dimension       3
+units           real 
+atom_style      hybrid full ellipsoid
+boundary        p p p
+
+special_bonds   lj 0.0 0.0 0.0 coul 0.0 0.0 0.0
+bond_style      harmonic
+
+#eldihedral angle style allows for dihedral potential between a disk and two beads
+angle_style     hybrid harmonic eldihedral 
+dihedral_style  none
+improper_style  none
+#kspace_style    pppm 0.0001
+
+pair_style hybrid lj/cut 10.0 sfunction 20.0 
+fix prop all property/atom i_coreid
+read_data "input.data" fix prop NULL CoreIDs 
+
+#pair_style hybrid lj/cut 10.0 sfunction 20.0 
+
+bond_coeff 1 0.0 1.4
+bond_coeff 2 604.0 1.52
+bond_coeff 3 496.0 1.532
+
+angle_coeff 1 harmonic 229.3 175.73
+angle_coeff 2 harmonic 143.18 114.5
+angle_coeff 3 eldihedral 0.0 0.61 0.0 0.138
+
+pair_coeff 1 1 lj/cut 0.25 4.152
+pair_coeff 2 2 lj/cut 0.1986 4.068
+pair_coeff 1 2 lj/cut 0.223 4.11
+pair_coeff 3 3 sfunction 1.25 1.344 1.090 0.293 0.063 -4.152 3.45 1.588 -0.698 -0.175 -0.268 0.841
+pair_coeff 1 3 sfunction 1.0 0.695 0.884 0.000 0.000 0.000 3.129 1.439 -0.872 0.000 0.000 0.000
+pair_coeff 2 3 sfunction 1.0 0.695 0.884 0.000 0.000 0.000 3.129 1.439 -0.872 0.000 0.000 0.000
+pair_coeff * 4 lj/cut 0.0 1.0
+
+group beads type 1 2
+group disks type 3 4
+group only_disks type 3
+#group sites type 3
+
+
+timestep 0.2
+
+compute pe_atom all pe/atom
+compute rot only_disks erotate/asphere
+variable mytime equal dt*step
+variable myetot equal etotal+c_rot
+
+restart 50000 equil.*.rst
+
+fix extra all print 5000 "${mytime}"
+
+#fix 1 beads nve 
+#fix 2 disks rigid/nve/small custom i_coreid
+
+fix 1 beads nvt temp 300.0 300.0 100.0 
+fix 2 disks rigid/nvt/small custom i_coreid temp 300.0 300.0 100.0
+
+#fix 1 beads nvt temp 300.0 300.0 100.0
+#fix 2 disks rigid/npt/small custom i_coreid temp 300.0 300.0 100.0 iso 1.0 1.0 10000.0 dilate all
+
+fix 3 all deform 1 x final 0 50.0 y final 0 50.0 z final 0 50.0 units box 
+
+dump 1 all xyz 100 traj.xyz 
+thermo_style	custom step temp epair etotal v_myetot press
+thermo		1000
+
+run 200000
+
+
